@@ -1,0 +1,57 @@
+version: "3.8"
+
+services:
+  postgres:
+    image: vuongtien294/postgres
+    restart: always
+    ports:
+      - "5432:5432"
+    networks:
+      - base
+    environment:
+      POSTGRES_DB: postgres
+      POSTGRES_PASSWORD: myPassword
+
+  registry-service:
+    image: vuongtien294/registry-service
+    mem_limit: 700m
+    ports:
+      - "8761:8761"
+    networks:
+      - base
+
+  gateway-service:
+    image: vuongtien294/gateway-service
+    mem_limit: 700m
+    ports:
+      - "8080:8080"
+    networks:
+      - base
+    depends_on:
+      - registry-service
+    environment:
+      SERVICE_REGISTRY_URL: http://registry-service:8761/eureka
+
+  user-service:
+    image: vuongtien294/user-service
+    mem_limit: 700m
+    ports:
+      - "8282:8282"
+    networks:
+      - base
+    depends_on:
+      - postgres
+      - registry-service
+      - gateway-service
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/postgres?useSSL=false&useUnicode=true&characterEncoding=UTF-8
+      SERVICE_REGISTRY_URL: http://registry-service:8761/eureka
+
+networks:
+  base:
+
+
+
+
+
+
