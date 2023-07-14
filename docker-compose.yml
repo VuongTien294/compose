@@ -1,20 +1,173 @@
 version: "3.8"
 
 services:
-  postgres:
-    image: vuongtien294/postgres
-    restart: always
+  user-service-database:
+    image: postgres
+    restart: unless-stopped
     ports:
       - "5432:5432"
     networks:
       - base
     environment:
-      POSTGRES_DB: postgres
+      POSTGRES_DB: user-service
+      POSTGRES_USER: postgres
       POSTGRES_PASSWORD: myPassword
+    volumes:
+      - ./user-service-database:/var/lib/postgresql/data
+
+  inventory-service-database:
+    image: postgres
+    restart: always
+    ports:
+      - "5433:5432"
+    networks:
+      - base
+    environment:
+      POSTGRES_DB: inventory-service
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: myPassword
+    volumes:
+      - ./inventory-service-database:/var/lib/postgresql/data
+
+  order-service-database:
+    image: postgres
+    restart: always
+    ports:
+      - "5434:5432"
+    networks:
+      - base
+    environment:
+      POSTGRES_DB: order-service
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: myPassword
+    volumes:
+      - ./order-service-database:/var/lib/postgresql/data
+
+  product-service-database:
+    image: postgres
+    restart: always
+    ports:
+      - "5435:5432"
+    networks:
+      - base
+    environment:
+      POSTGRES_DB: product-service
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: myPassword
+    volumes:
+      - ./product-service-database:/var/lib/postgresql/data
+
+  pgadmin:
+    image: dpage/pgadmin4
+    networks:
+      - base
+    environment:
+      PGADMIN_DEFAULT_EMAIL: "tien@gmail.com"
+      PGADMIN_DEFAULT_PASSWORD: "1"
+    ports:
+      - "16543:80"
+    depends_on:
+      - user-service-database
+      - inventory-service-database
+      - order-service-database
+      - product-service-database
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:latest
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+      ZOOKEEPER_ADMIN_ENABLE_SERVER: 'false'
+    ports:
+      - 2181:2181
+    restart: always
+    networks:
+      - base
+
+  kafka-1:
+    image: confluentinc/cp-kafka:latest
+    depends_on:
+      - zookeeper
+    ports:
+      - 29092:29092
+    restart: always
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: 'zookeeper:2181'
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka-1:9092,PLAINTEXT_HOST://localhost:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_NUM_PARTITIONS: '3'
+      KAFKA_DEFAULT_REPLICATION_FACTOR: 2
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'true'
+    volumes:
+      - ./kafka-1:/var/lib/kafka/data
+    networks:
+      - base
+
+  kafka-2:
+    image: confluentinc/cp-kafka:latest
+    depends_on:
+      - zookeeper
+    ports:
+      - 39093:39093
+    restart: always
+    environment:
+      KAFKA_BROKER_ID: 2
+      KAFKA_ZOOKEEPER_CONNECT: 'zookeeper:2181'
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka-2:9093,PLAINTEXT_HOST://localhost:39093
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_NUM_PARTITIONS: '3'
+      KAFKA_DEFAULT_REPLICATION_FACTOR: 2
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'true'
+    volumes:
+      - ./kafka-2:/var/lib/kafka/data
+    networks:
+      - base
+
+  akhq:
+    image: tchiotludo/akhq
+    depends_on:
+      - kafka-1
+      - kafka-2
+    networks:
+      - base
+    ports:
+      - 8080:8080
+    restart: unless-stopped
+    environment:
+      AKHQ_CONFIGURATION: |
+        akhq:
+          connections:
+            docker-kafka-server:
+              properties:
+                bootstrap.servers: "kafka-1:9092,kafka-2:9093"
+        micronaut:
+          security:
+            enabled: true
+            token:
+              jwt:
+                signatures:
+                  secret:
+                    generator:
+                      secret: my_secret_key
+        akhq.security:
+          basic-auth:
+            - username: admin
+              password: 6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b
+              groups:
+              - admin
+            - username: reader
+              password: 6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b
+              groups:
+              - reader
 
   registry-service:
     image: vuongtien294/registry-service
-    mem_limit: 700m
+    restart: always
     ports:
       - "8761:8761"
     networks:
@@ -22,9 +175,9 @@ services:
 
   gateway-service:
     image: vuongtien294/gateway-service
-    mem_limit: 700m
+    restart: always
     ports:
-      - "8080:8080"
+      - "8000:8000"
     networks:
       - base
     depends_on:
@@ -34,24 +187,82 @@ services:
 
   user-service:
     image: vuongtien294/user-service
-    mem_limit: 700m
+    restart: always
     ports:
       - "8282:8282"
     networks:
       - base
     depends_on:
-      - postgres
+      - user-service-database
       - registry-service
       - gateway-service
     environment:
-      DB_URL: jdbc:postgresql://postgres:5432/postgres?useSSL=false&useUnicode=true&characterEncoding=UTF-8
+      DB_URL: jdbc:postgresql://user-service-database:5432/user-service?useSSL=false&useUnicode=true&characterEncoding=UTF-8
       SERVICE_REGISTRY_URL: http://registry-service:8761/eureka
+
+  inventory-service:
+    image: vuongtien294/inventory-service
+    restart: always
+    ports:
+      - "8284:8284"
+    networks:
+      - base
+    depends_on:
+      - inventory-service-database
+      - registry-service
+      - gateway-service
+    environment:
+      DB_URL: jdbc:postgresql://inventory-service-database:5432/inventory-service?useSSL=false&useUnicode=true&characterEncoding=UTF-8
+      SERVICE_REGISTRY_URL: http://registry-service:8761/eureka
+
+  order-service:
+    image: vuongtien294/order-service
+    restart: always
+    ports:
+      - "8281:8281"
+    networks:
+      - base
+    depends_on:
+      - order-service-database
+      - registry-service
+      - gateway-service
+    environment:
+      DB_URL: jdbc:postgresql://order-service-database:5432/order-service?useSSL=false&useUnicode=true&characterEncoding=UTF-8
+      SERVICE_REGISTRY_URL: http://registry-service:8761/eureka
+      KAFKA_SEVERS_CONFIG: http://kafka-1:9092,http://kafka-2:9093
+      CHECK-QUANTITY-INVENTORY-URL: http://inventory-service:8284/api/inventory/check-quantity
+
+  product-service:
+    image: vuongtien294/product-service
+    restart: always
+    ports:
+      - "8283:8283"
+    networks:
+      - base
+    depends_on:
+      - product-service-database
+      - registry-service
+      - gateway-service
+    environment:
+      DB_URL: jdbc:postgresql://product-service-database:5432/product-service?useSSL=false&useUnicode=true&characterEncoding=UTF-8
+      SERVICE_REGISTRY_URL: http://registry-service:8761/eureka
+      CREATE-INVENTORY-URL: http://inventory-service:8284/api/inventory/create-inventory
+
+  notification-service:
+    image: vuongtien294/notification-service
+    restart: always
+    ports:
+      - "8285:8285"
+    networks:
+      - base
+    depends_on:
+      - kafka-1
+      - kafka-2
+      - registry-service
+      - gateway-service
+    environment:
+      SERVICE_REGISTRY_URL: http://registry-service:8761/eureka
+      KAFKA_SEVERS_CONFIG: http://kafka-1:9092,http://kafka-2:9093
 
 networks:
   base:
-
-
-
-
-
-
