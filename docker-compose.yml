@@ -165,6 +165,16 @@ services:
               groups:
               - reader
 
+  redis:
+    image: redis:latest
+    restart: always
+    ports:
+      - "6379:6379"
+    volumes:
+      - ./redis:/data
+    networks:
+      - base
+
   registry-service:
     image: vuongtien294/registry-service
     restart: always
@@ -199,6 +209,7 @@ services:
     environment:
       DB_URL: jdbc:postgresql://user-service-database:5432/user-service?useSSL=false&useUnicode=true&characterEncoding=UTF-8
       SERVICE_REGISTRY_URL: http://registry-service:8761/eureka
+      REDIS_HOST: redis
 
   inventory-service:
     image: vuongtien294/inventory-service
