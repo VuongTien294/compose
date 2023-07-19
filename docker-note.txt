@@ -1,0 +1,72 @@
+Các lệnh cơ bản :
+- docker run imageName (VD : docker run nginx:latest) : pulll image sau đó chạy image
+- docker stop container-id (hoặc container-name) : dừng container
+- docker rm container-id (hoặc container-name) : remove container
+- docker images : liệt kê tất cả các images đang trong máy
+- docker rm image-name : xóa image (trước khi xóa phải xóa container liên quan đến image)
+- docker pull image : pull image nma ko chạy image
+- docker exec -it container-id bash : dùng để chạy command vào sâu bên trong container
+- docker attach :
+- docker -d container-id : chạy ngầm container 
+
+I.Các lệnh liên quan đến lifecycle của 1 container :
+1.List các container :
+- docker ps : liệt kê tất cả các container đang chạy
+- docker ps -a : liệt kê tất cả các container đang chạy và cả ko chạy
+2.Tạo mới 1 container nma ko start
+- docker create image-name
+3.Tạo mới 1 container nma start (docker run = create container + start container)
+- docker run image-name
+4.Xóa container
+- docker rm container-id : xóa 1 container đã stop
+- docker rm -f container-id : xóa 1 container chưa stop
+- docker prune : xóa tất cả các container đang stop
+
+II.Các lệnh quản lý trạng thái của 1 container
+1.Start container (start là chạy 1 container đã stop) :
+- docker start container-id
+2.Stop container :
+- docker stop container-id
+3.Restart container :
+- docker restart container-id
+4.Pause container :
+- docker pause container-id
+5.Unpause container :
+- docker unpause container-id
+
+III.Các lệnh hiển thị thông tin của 1 container :
+1.Log container :
+- docker logs [OPTION] container-id
+- docker logs -f -n 100 container-id
+2.Hiển thị thông tin của 1 container
+- docker inspect container-id
+3.Hiển thị tài nguyên đang sử dụng của 1 container
+- docker stats container-id [OPTION]
+4.Hiển thị các tiến trình đnag chạy trong container
+- docker top container-id [ps OPTION]
+5.Hiển thị các port được map
+- docker port containe-id
+6.Hiển thị các thay đổi về filesystem trong container
+- docker diff container-id
+
+IV.Các lệnh thực thi với container
+1.Attach container : attach cho phép 1 màn hình để nhập input và hiển thị outout đối với 1 container đang chạy
+- docker attach [OPTION] container-id
+2.Thực thi 1 câu lệnh trong container
+- docker exec [OPTION] container-id COMMAND
+VD : docker exec -it container-id bash
+3.Update resource cho container : mở rộng , limit tài nguyên cho container
+- docker update [OPTION] container-id
+VD : docker update -m 512M --memory-swap 1024M container-id
+4.Copy file giữa host và container
+- docker cp [OPTION] SRC_PATH container:DEST_PATH
+VD : docker cp my-container:/opt/myfile /opt/
+     docker cp myfile1.txt my-container:/opt/
+5.Đổi tên container
+- docker rename container container_new_name
+VD : docker rename container-id test-container
+6.Export toàn bộ filesystem trong container thành 1 file tar
+- docker export [OPTIONS] container
+7.Tạo 1 image từ container đang chạy 
+- docker commit [OPTIONS] container-id [REPOSITORY[:TAG]]
+VD : docker commit container-id my-new-image
